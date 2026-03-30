@@ -55,7 +55,6 @@ fn test_automation_curve_interpolation() {
     assert!((curve.get_value_at(0) - 0.0).abs() < 1e-6);
     assert!((curve.get_value_at(50) - 0.5).abs() < 1e-6);
     assert!((curve.get_value_at(100) - 1.0).abs() < 1e-6);
-    assert!((curve.get_value_at(0) - 0.0).abs() < 1e-6);
     assert!((curve.get_value_at(200) - 1.0).abs() < 1e-6);
 }
 
@@ -93,8 +92,8 @@ fn test_engine_block_processing() {
     let master = engine.graph.add_node(Box::new(MasterNode));
     engine.graph.connect(source, master).unwrap();
 
-    handle.send_command(AudioCommand::StartPlayback).unwrap();
-    handle.send_command(AudioCommand::SetTempo { bpm: 140.0 }).unwrap();
+    assert!(handle.send_command(AudioCommand::StartPlayback), "Command queue full");
+    assert!(handle.send_command(AudioCommand::SetTempo { bpm: 140.0 }), "Command queue full");
 
     for _ in 0..10 {
         let block = engine.process_block();

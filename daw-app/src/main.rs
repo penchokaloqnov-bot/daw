@@ -30,9 +30,9 @@ fn main() {
     engine.graph.connect(source, gain).unwrap();
     engine.graph.connect(gain, master).unwrap();
 
-    handle.send_command(AudioCommand::SetVolume { track_id: 0, value: 0.9 }).unwrap();
-    handle.send_command(AudioCommand::SetTempo { bpm: 128.0 }).unwrap();
-    handle.send_command(AudioCommand::StartPlayback).unwrap();
+    assert!(handle.send_command(AudioCommand::SetVolume { track_id: 0, value: 0.9 }), "Command queue full");
+    assert!(handle.send_command(AudioCommand::SetTempo { bpm: 128.0 }), "Command queue full");
+    assert!(handle.send_command(AudioCommand::StartPlayback), "Command queue full");
 
     let mut all_audio = Vec::new();
     for i in 0..10 {

@@ -141,12 +141,13 @@ impl AudioGraph {
     }
 
     pub fn process_graph(&mut self, buffer_size: usize, params: &NodeParams) -> Result<Vec<f32>, GraphError> {
+        let buf_size = if buffer_size > 0 { buffer_size } else { self.buffer_size };
         let order = toposort(&self.graph, None).map_err(|_| GraphError::CycleDetected)?;
         debug!("Processing {} nodes in topological order", order.len());
 
         let mut outputs: std::collections::HashMap<NodeIndex, Vec<f32>> = std::collections::HashMap::new();
 
-        let mut last_output = vec![0.0f32; buffer_size];
+        let mut last_output = vec![0.0f32; buf_size];
 
         for node_idx in &order {
             let predecessors: Vec<NodeIndex> = self.graph
@@ -159,7 +160,7 @@ impl AudioGraph {
 
             let input_slices: Vec<&[f32]> = input_data.iter().map(|v| v.as_slice()).collect();
 
-            let mut output = vec![0.0f32; buffer_size];
+            let mut output = vec![0.0f32; buf_size];
 
             if let Some(node) = self.graph.node_weight_mut(*node_idx) {
                 node.process(&input_slices, &mut output, params);

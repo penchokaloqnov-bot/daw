@@ -75,7 +75,7 @@ mod tests {
         let mut target = RenderTarget::new(100, 50);
         target.set_pixel(99, 49, 0xFFFFFFFF);
         target.set_pixel(100, 50, 0xDEADBEEF); // out of bounds — no panic
-        assert_eq!(target.pixels[99 * 1 + 49 * 100], 0xFFFFFFFF); // last valid pixel set
+        assert_eq!(target.pixels[49 * 100 + 99], 0xFFFFFFFF); // row * width + column
     }
 
     #[test]

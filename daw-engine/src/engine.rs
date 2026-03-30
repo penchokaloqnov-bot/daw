@@ -116,10 +116,8 @@ impl AudioEngine {
             tempo: self.state.tempo_bpm,
         };
 
-        let output = self.graph.process_graph(self.config.buffer_size, &params)
+        let mut output = self.graph.process_graph(self.config.buffer_size, &params)
             .unwrap_or_else(|_| vec![0.0f32; self.config.buffer_size]);
-
-        let mut output = output;
         dsp::apply_gain_simd(&mut output, self.state.master_volume);
 
         let peak = dsp::compute_peak(&output);
@@ -137,8 +135,8 @@ pub struct AudioEngineHandle {
 }
 
 impl AudioEngineHandle {
-    pub fn send_command(&mut self, cmd: AudioCommand) -> Result<(), ()> {
-        self.command_producer.send(cmd).map_err(|_| ())
+    pub fn send_command(&mut self, cmd: AudioCommand) -> bool {
+        self.command_producer.send(cmd).is_ok()
     }
 
     pub fn drain_telemetry(&mut self) -> Vec<TelemetryEvent> {

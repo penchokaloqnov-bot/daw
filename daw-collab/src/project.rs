@@ -114,7 +114,14 @@ impl CollaborativeProject {
                     },
                     _ => false,
                 };
-                tracks.push(TrackState { id, name, volume, pan, muted, solo: false });
+                let solo = match self.doc.get(&track_oid, "solo") {
+                    Ok(Some((automerge::Value::Scalar(s), _))) => match s.as_ref() {
+                        ScalarValue::Boolean(v) => *v,
+                        _ => false,
+                    },
+                    _ => false,
+                };
+                tracks.push(TrackState { id, name, volume, pan, muted, solo });
             }
         }
         tracks
