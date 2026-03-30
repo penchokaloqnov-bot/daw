@@ -1,0 +1,8 @@
+[package]
+name = "daw-collab"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+automerge = { workspace = true }
+tracing = { workspace = true }

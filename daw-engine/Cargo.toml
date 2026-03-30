@@ -1,0 +1,14 @@
+[package]
+name = "daw-engine"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+rtrb = { workspace = true }
+petgraph = { workspace = true }
+wide = { workspace = true }
+tracing = { workspace = true }
+crossbeam-channel = { workspace = true }
+
+[dev-dependencies]
+approx = "0.5"

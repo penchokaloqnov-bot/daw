@@ -1,0 +1,11 @@
+[package]
+name = "daw-app"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+daw-engine = { path = "../daw-engine" }
+daw-ai = { path = "../daw-ai" }
+daw-collab = { path = "../daw-collab" }
+tracing = { workspace = true }
+tracing-subscriber = "0.3"

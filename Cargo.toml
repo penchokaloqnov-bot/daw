@@ -1,0 +1,11 @@
+[workspace]
+members = ["daw-engine", "daw-ai", "daw-collab", "daw-app"]
+resolver = "2"
+
+[workspace.dependencies]
+rtrb = "0.3"
+petgraph = "0.6"
+wide = "0.7"
+automerge = "0.5"
+tracing = "0.1"
+crossbeam-channel = "0.5"
