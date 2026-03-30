@@ -7,5 +7,6 @@ edition = "2021"
 daw-engine = { path = "../daw-engine" }
 daw-ai = { path = "../daw-ai" }
 daw-collab = { path = "../daw-collab" }
+daw-midi = { path = "../daw-midi" }
 tracing = { workspace = true }
 tracing-subscriber = "0.3"

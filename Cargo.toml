@@ -1,5 +1,5 @@
 [workspace]
-members = ["daw-engine", "daw-ai", "daw-collab", "daw-app", "daw-renderer", "daw-tauri"]
+members = ["daw-engine", "daw-ai", "daw-collab", "daw-app", "daw-renderer", "daw-tauri", "daw-midi"]
 resolver = "2"
 
 [workspace.dependencies]

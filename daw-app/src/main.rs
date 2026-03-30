@@ -1,6 +1,7 @@
 use daw_engine::*;
 use daw_ai::{SmartEq, StemSeparator, StemSeparatorConfig};
 use daw_collab::CollaborativeProject;
+use daw_midi::{MidiMessage, MidiTrack, MidiSequencer, PolySynth, WaveShape};
 use tracing::info;
 
 fn main() {
@@ -57,6 +58,54 @@ fn main() {
         }
     }
 
+    // --- MIDI + Synth Demo ---
+    println!("\n--- MIDI & PolySynth Demo ---");
+
+    // C4-E4-G4 triad arpeggiated at 120 BPM, 480 ticks/beat
+    let mut midi_track = MidiTrack::new("Arpeggio");
+    // C4=60, E4=64, G4=67; each note 240 ticks = half beat
+    let notes = [(60u8, 0u64), (64, 240), (67, 480)];
+    for (pitch, start_tick) in notes {
+        midi_track.add_event(start_tick, MidiMessage::NoteOn { channel: 0, pitch, velocity: 100 });
+        midi_track.add_event(start_tick + 200, MidiMessage::NoteOff { channel: 0, pitch });
+    }
+    midi_track.sort();
+
+    let mut synth = PolySynth::new(8, 44100, WaveShape::Sine);
+    let mut seq = MidiSequencer::new(midi_track, 480, 44100, 120.0);
+
+    // Add synth + filter + reverb chain in a new graph
+    let mut synth_graph = AudioGraph::new(512);
+    let synth_node = synth_graph.add_node(Box::new(PolySynth::new(8, 44100, WaveShape::Sine)));
+    let filter_node = synth_graph.add_node(Box::new(BiquadFilter::new(
+        BiquadType::LowPass, 4000.0, 0.707, 0.0, 44100.0,
+    )));
+    let reverb_node = synth_graph.add_node(Box::new(SimpleReverb::new(0.7, 0.3, 44100)));
+    synth_graph.connect(synth_node, filter_node).unwrap();
+    synth_graph.connect(filter_node, reverb_node).unwrap();
+
+    // Drive the standalone synth with the sequencer for 20 blocks
+    let mut synth_audio = Vec::new();
+    for block_idx in 0..20 {
+        let cmds = seq.advance(512);
+        for cmd in cmds {
+            match cmd {
+                AudioCommand::NoteOn { pitch, velocity } => synth.note_on(pitch, velocity),
+                AudioCommand::NoteOff { pitch } => synth.note_off(pitch),
+                _ => {}
+            }
+        }
+        let mut block = vec![0.0f32; 512];
+        synth.generate_block(&mut block);
+        let peak = compute_peak(&block);
+        if block_idx < 5 {
+            println!("Synth block {}: peak={:.4}, active_voices={}", block_idx, peak, synth.active_voice_count());
+        }
+        synth_audio.extend_from_slice(&block);
+    }
+    println!("Synth produced {} samples total", synth_audio.len());
+
+    // --- Collaborative Project Demo ---
     println!("\n--- Collaborative Project Demo ---");
     let mut project = CollaborativeProject::new();
     project.add_track(1, "Drums").unwrap();
@@ -74,6 +123,36 @@ fn main() {
         println!("  Track {}: '{}' volume={:.2} muted={}", track.id, track.name, track.volume, track.muted);
     }
 
+    // --- Project File Save/Load Demo ---
+    println!("\n--- Project File Format Demo ---");
+    let mut pf = ProjectFile::new("My DAW Project", 44100, 512);
+    pf.tempo_bpm = 120.0;
+    pf.master_volume = 0.9;
+
+    let mut t1 = TrackConfig::new(0, "Synth");
+    t1.node_type = "polysynth".to_string();
+    t1.node_params.insert("max_voices".to_string(), 8.0);
+    pf.add_track(t1);
+
+    let mut t2 = TrackConfig::new(1, "Drums");
+    t2.volume = 0.8;
+    pf.add_track(t2);
+
+    pf.add_automation(AutomationData {
+        parameter: "master_volume".to_string(),
+        points: vec![(0, 0.0), (44100, 1.0)],
+    });
+
+    pf.validate().expect("Project should be valid");
+    let json = pf.to_json().expect("Serialize to JSON");
+    println!("Project JSON ({} bytes):\n{}", json.len(), &json[..json.len().min(300)]);
+
+    let loaded_pf = ProjectFile::from_json(&json).expect("Deserialize from JSON");
+    assert_eq!(loaded_pf.name, pf.name);
+    assert_eq!(loaded_pf.tracks.len(), 2);
+    println!("Project loaded back successfully: '{}' with {} tracks", loaded_pf.name, loaded_pf.tracks.len());
+
+    // --- AI EQ Analysis Demo ---
     println!("\n--- AI EQ Analysis Demo ---");
     let eq = SmartEq::new();
     let suggestion = eq.analyze(&all_audio[..512.min(all_audio.len())], 44100);

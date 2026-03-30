@@ -103,3 +103,54 @@ fn test_engine_block_processing() {
     let telemetry = handle.drain_telemetry();
     assert!(!telemetry.is_empty(), "Should have telemetry events");
 }
+
+#[test]
+fn test_project_file_roundtrip() {
+    use daw_engine::{ProjectFile, TrackConfig, AutomationData};
+
+    let mut project = ProjectFile::new("Test Project", 44100, 512);
+    project.tempo_bpm = 130.0;
+    project.master_volume = 0.9;
+
+    let mut track1 = TrackConfig::new(0, "Drums");
+    track1.volume = 0.8;
+    track1.pan = -0.2;
+    track1.node_type = "source".to_string();
+    track1.node_params.insert("gain".to_string(), 1.0);
+    project.add_track(track1);
+
+    let mut track2 = TrackConfig::new(1, "Bass");
+    track2.volume = 1.0;
+    track2.muted = true;
+    project.add_track(track2);
+
+    project.add_automation(AutomationData {
+        parameter: "master_volume".to_string(),
+        points: vec![(0, 0.0), (44100, 1.0), (88200, 0.5)],
+    });
+
+    project.validate().expect("Project should be valid");
+
+    let json = project.to_json().expect("Should serialize to JSON");
+    assert!(!json.is_empty());
+
+    let loaded = ProjectFile::from_json(&json).expect("Should deserialize from JSON");
+    assert_eq!(loaded.name, "Test Project");
+    assert_eq!(loaded.sample_rate, 44100);
+    assert_eq!(loaded.buffer_size, 512);
+    assert!((loaded.tempo_bpm - 130.0).abs() < 1e-6);
+    assert!((loaded.master_volume - 0.9).abs() < 1e-6);
+    assert_eq!(loaded.tracks.len(), 2);
+    assert_eq!(loaded.tracks[0].name, "Drums");
+    assert!((loaded.tracks[0].volume - 0.8).abs() < 1e-6);
+    assert_eq!(loaded.tracks[1].name, "Bass");
+    assert!(loaded.tracks[1].muted);
+    assert_eq!(loaded.automation.len(), 1);
+    assert_eq!(loaded.automation[0].parameter, "master_volume");
+    assert_eq!(loaded.automation[0].points.len(), 3);
+
+    // Test bytes roundtrip
+    let bytes = project.to_bytes().unwrap();
+    let from_bytes = ProjectFile::from_bytes(&bytes).unwrap();
+    assert_eq!(from_bytes.name, project.name);
+}

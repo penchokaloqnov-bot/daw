@@ -104,6 +104,7 @@ impl AudioEngine {
     }
 
     pub fn process_block(&mut self) -> Vec<f32> {
+        let _span = tracing::span!(tracing::Level::TRACE, "process_block").entered();
         self.process_commands();
 
         if self.state.is_playing {

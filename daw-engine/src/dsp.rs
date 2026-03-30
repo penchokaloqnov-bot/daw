@@ -75,3 +75,69 @@ pub fn compute_rms(buffer: &[f32]) -> f32 {
     let sum_sq: f32 = buffer.iter().map(|x| x * x).sum();
     (sum_sq / buffer.len() as f32).sqrt()
 }
+
+
+// --- Stereo processing ---
+
+pub fn apply_gain_stereo(buffer: &mut [f32], gain_l: f32, gain_r: f32) {
+    for chunk in buffer.chunks_mut(2) {
+        if chunk.len() == 2 {
+            chunk[0] *= gain_l;
+            chunk[1] *= gain_r;
+        }
+    }
+}
+
+pub fn apply_pan_stereo(buffer: &mut [f32], pan: f32) {
+    use std::f32::consts::PI;
+    let gain_l = (PI / 4.0 * (1.0 - pan)).cos();
+    let gain_r = (PI / 4.0 * (1.0 + pan)).cos();
+    apply_gain_stereo(buffer, gain_l, gain_r);
+}
+
+pub fn mono_to_stereo(mono: &[f32]) -> Vec<f32> {
+    let mut stereo = Vec::with_capacity(mono.len() * 2);
+    for &s in mono {
+        stereo.push(s);
+        stereo.push(s);
+    }
+    stereo
+}
+
+pub fn stereo_to_mono(stereo: &[f32]) -> Vec<f32> {
+    stereo.chunks(2)
+        .map(|c| if c.len() == 2 { (c[0] + c[1]) * 0.5 } else { c[0] })
+        .collect()
+}
+
+pub fn compute_stereo_peak(stereo: &[f32]) -> (f32, f32) {
+    let mut left_peak = 0.0f32;
+    let mut right_peak = 0.0f32;
+    for (i, &s) in stereo.iter().enumerate() {
+        if i % 2 == 0 {
+            left_peak = left_peak.max(s.abs());
+        } else {
+            right_peak = right_peak.max(s.abs());
+        }
+    }
+    (left_peak, right_peak)
+}
+
+pub fn compute_stereo_rms(stereo: &[f32]) -> (f32, f32) {
+    let mut left_sum_sq = 0.0f32;
+    let mut right_sum_sq = 0.0f32;
+    let mut left_count = 0usize;
+    let mut right_count = 0usize;
+    for (i, &s) in stereo.iter().enumerate() {
+        if i % 2 == 0 {
+            left_sum_sq += s * s;
+            left_count += 1;
+        } else {
+            right_sum_sq += s * s;
+            right_count += 1;
+        }
+    }
+    let left_rms = if left_count > 0 { (left_sum_sq / left_count as f32).sqrt() } else { 0.0 };
+    let right_rms = if right_count > 0 { (right_sum_sq / right_count as f32).sqrt() } else { 0.0 };
+    (left_rms, right_rms)
+}

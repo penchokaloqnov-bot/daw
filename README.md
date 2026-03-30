@@ -177,3 +177,124 @@ GitHub Actions workflow (`.github/workflows/ci.yml`):
 | `headless-audio-test` | Runs `daw-engine`, `daw-ai`, `daw-collab` tests in isolation |
 
 Triggers on pushes to `main` / `copilot/*` branches and all pull requests.
+
+---
+
+## Phase 6 — MIDI Engine & Polyphonic Synthesis
+
+*Crate:* `daw-midi`
+
+- **MIDI Types** (`types.rs`) — `MidiMessage`, `MidiEvent`, `MidiTrack` with sort and duration helpers; `midi_pitch_to_hz` and `ticks_to_samples` utilities.
+- **MidiSequencer** (`sequencer.rs`) — tick-based playback with sample-accurate scheduling; converts MIDI events to `AudioCommand::NoteOn/NoteOff`; supports `reset()`, `set_bpm()`, and `advance(num_samples)`.
+- **PolySynth** (`synth.rs`) — polyphonic synthesiser with configurable voice count; ADSR envelope per voice; four waveforms: `Sine`, `Sawtooth`, `Square`, `Triangle`; voice stealing when at capacity; implements `AudioNode` for graph integration.
+
+```rust
+use daw_midi::{MidiTrack, MidiMessage, MidiSequencer, PolySynth, WaveShape};
+
+let mut track = MidiTrack::new("Arpeggio");
+track.add_event(0,   MidiMessage::NoteOn  { channel: 0, pitch: 60, velocity: 100 });
+track.add_event(480, MidiMessage::NoteOff { channel: 0, pitch: 60 });
+track.sort();
+
+let mut seq   = MidiSequencer::new(track, 480, 44100, 120.0);
+let mut synth = PolySynth::new(8, 44100, WaveShape::Sine);
+
+let cmds = seq.advance(512); // returns AudioCommands for this block
+for cmd in cmds { /* route to synth.note_on / note_off */ }
+
+let mut block = vec![0.0f32; 512];
+synth.generate_block(&mut block);
+```
+
+---
+
+## Phase 7 — Built-in DSP Plugins
+
+*Crate:* `daw-engine` (`plugins.rs`)
+
+All plugins implement `AudioNode` and integrate directly into the audio graph.
+
+| Plugin | Description |
+|--------|-------------|
+| `BiquadFilter` | 7-type biquad (LP/HP/BP/Notch/PeakEQ/LowShelf/HighShelf) — Audio EQ Cookbook coefficients, Direct Form II Transposed |
+| `Compressor` | Feed-forward RMS compressor with configurable threshold, ratio, attack/release, makeup gain |
+| `SimpleReverb` | Schroeder reverb: 4 parallel comb filters + 2 series allpass filters; `room_size` and `wet` controls |
+| `DelayLine` | Feedback delay with configurable delay time (ms), feedback (capped at 0.95), and wet/dry mix |
+
+```rust
+use daw_engine::{BiquadFilter, BiquadType, Compressor, SimpleReverb, DelayLine};
+
+let lp  = BiquadFilter::new(BiquadType::LowPass, 4000.0, 0.707, 0.0, 44100.0);
+let cmp = Compressor::new(-12.0, 4.0, 5.0, 100.0, 2.0, 44100.0);
+let rev = SimpleReverb::new(0.8, 0.3, 44100);
+let dly = DelayLine::new(250.0, 0.4, 0.5, 44100);
+```
+
+---
+
+## Phase 8 — Stereo Processing
+
+*Crate:* `daw-engine` (`dsp.rs`, `audio_graph.rs`)
+
+Stereo buffers are interleaved: `[L0, R0, L1, R1, ...]`.
+
+| Function / Node | Description |
+|-----------------|-------------|
+| `apply_gain_stereo(buf, gain_l, gain_r)` | Independent L/R gain on interleaved buffer |
+| `apply_pan_stereo(buf, pan)` | Constant-power panning (−1.0 hard-left … +1.0 hard-right) |
+| `mono_to_stereo(mono)` | Duplicate each sample → interleaved stereo |
+| `stereo_to_mono(stereo)` | Average L+R pairs → mono |
+| `compute_stereo_peak(buf)` | Returns `(left_peak, right_peak)` |
+| `compute_stereo_rms(buf)` | Returns `(left_rms, right_rms)` |
+| `StereoGainNode { gain_l, gain_r }` | `AudioNode` applying per-channel gain in the graph |
+
+---
+
+## Phase 9 — Project File Format
+
+*Crate:* `daw-engine` (`project_file.rs`)
+
+JSON-serialisable project format with validation.
+
+```rust
+use daw_engine::{ProjectFile, TrackConfig, AutomationData};
+
+let mut pf = ProjectFile::new("My Project", 44100, 512);
+pf.tempo_bpm = 128.0;
+
+let mut t = TrackConfig::new(0, "Lead Synth");
+t.node_type = "polysynth".to_string();
+t.node_params.insert("max_voices".to_string(), 8.0);
+pf.add_track(t);
+
+pf.add_automation(AutomationData {
+    parameter: "master_volume".to_string(),
+    points: vec![(0, 0.0), (44100, 1.0)],
+});
+
+pf.validate()?;
+let json  = pf.to_json()?;
+let bytes = pf.to_bytes()?;
+let back  = ProjectFile::from_json(&json)?;
+```
+
+Validation checks: `sample_rate` ∈ [8000, 192000], `buffer_size` power-of-two ∈ [64, 16384], `tempo_bpm` ∈ [20, 400], volumes ∈ [0, 2], pans ∈ [−1, 1].
+
+---
+
+## Phase 10 — Profiling
+
+*Crate:* `daw-engine` (`profiling.rs`)
+
+Optional [Tracy](https://github.com/wolfpld/tracy) integration via the `tracy` feature flag.
+
+```bash
+# Build with Tracy profiling enabled
+cargo build --workspace --features daw-engine/tracy
+```
+
+- `init_profiling()` — sets up the `tracing-tracy` subscriber when the `tracy` feature is active; no-op otherwise.
+- `profile_span(name)` — creates a `tracing::Span` at `TRACE` level for custom instrumentation.
+- `process_block()` in `AudioEngine` is automatically wrapped in a `"process_block"` span.
+
+When built without `--features tracy` (the default), the entire profiling stack compiles away to zero overhead.

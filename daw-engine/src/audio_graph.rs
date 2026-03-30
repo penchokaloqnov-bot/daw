@@ -173,3 +173,32 @@ impl AudioGraph {
         Ok(last_output)
     }
 }
+
+pub struct StereoGainNode {
+    pub gain_l: f32,
+    pub gain_r: f32,
+}
+
+impl StereoGainNode {
+    pub fn new(gain_l: f32, gain_r: f32) -> Self {
+        StereoGainNode { gain_l, gain_r }
+    }
+}
+
+impl AudioNode for StereoGainNode {
+    fn process(&mut self, inputs: &[&[f32]], output: &mut [f32], _params: &NodeParams) {
+        for o in output.iter_mut() { *o = 0.0; }
+        if let Some(input) = inputs.first() {
+            let len = output.len().min(input.len());
+            output[..len].copy_from_slice(&input[..len]);
+        }
+        // Apply stereo gain to interleaved buffer
+        for chunk in output.chunks_mut(2) {
+            if chunk.len() == 2 {
+                chunk[0] *= self.gain_l;
+                chunk[1] *= self.gain_r;
+            }
+        }
+    }
+    fn name(&self) -> &str { "StereoGainNode" }
+}

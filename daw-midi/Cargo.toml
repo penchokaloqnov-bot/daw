@@ -1,0 +1,8 @@
+[package]
+name = "daw-midi"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+daw-engine = { path = "../daw-engine" }
+tracing = { workspace = true }
