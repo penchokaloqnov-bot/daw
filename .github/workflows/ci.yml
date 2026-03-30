@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+    branches: [main, "copilot/*"]
+  pull_request:
+    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-and-test:
+    name: Build & Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - name: Build workspace
+        run: cargo build --workspace --exclude daw-fuzz
+      - name: Run tests
+        run: cargo test --workspace --exclude daw-fuzz
+      - name: Clippy
+        run: cargo clippy --workspace --exclude daw-fuzz -- -D warnings
+
+  headless-audio-test:
+    name: Headless Audio Engine Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+      - name: Run daw-engine tests (headless)
+        run: cargo test -p daw-engine --verbose
+      - name: Run daw-ai tests (headless)
+        run: cargo test -p daw-ai --verbose
+      - name: Run daw-collab tests (headless)
+        run: cargo test -p daw-collab --verbose

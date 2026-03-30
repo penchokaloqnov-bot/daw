@@ -1,0 +1,24 @@
+[package]
+name = "daw-fuzz"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[package.metadata.cargo-fuzz]
+# requires nightly to run: cargo +nightly fuzz run fuzz_audio_graph
+
+[dependencies]
+libfuzzer-sys = "0.4"
+daw-engine = { path = "../daw-engine" }
+
+[[bin]]
+name = "fuzz_audio_graph"
+path = "fuzz_targets/fuzz_audio_graph.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzz_automation"
+path = "fuzz_targets/fuzz_automation.rs"
+test = false
+doc = false
