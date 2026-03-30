@@ -1,0 +1,14 @@
+[package]
+name = "daw-renderer"
+version = "0.1.0"
+edition = "2021"
+
+[features]
+default = []
+gpu = ["wgpu", "winit", "bytemuck"]
+
+[dependencies]
+tracing = { workspace = true }
+wgpu = { version = "0.20", optional = true }
+winit = { version = "0.29", optional = true }
+bytemuck = { version = "1.14", features = ["derive"], optional = true }
